@@ -163,6 +163,9 @@ void TwoLevelIterator::InitDataBlock() {
       // no need to change anything
     } else {
       Iterator* iter = (*block_function_)(arg_, options_, handle);
+      //for (iter->SeekToFirst(); iter->Valid(); iter->Next()) {
+     // printf("TLI:%s %s",iter->key().ToString().c_str(),iter->value().ToString().c_str());
+     //}
       data_block_handle_.assign(handle.data(), handle.size());
       SetDataIterator(iter);
     }

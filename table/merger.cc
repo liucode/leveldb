@@ -20,7 +20,7 @@ class MergingIterator : public Iterator {
         current_(NULL),
         direction_(kForward) {
     for (int i = 0; i < n; i++) {
-      children_[i].Set(children[i]);
+         children_[i].Set(children[i]);
     }
   }
 
@@ -156,10 +156,18 @@ void MergingIterator::FindSmallest() {
   IteratorWrapper* smallest = NULL;
   for (int i = 0; i < n_; i++) {
     IteratorWrapper* child = &children_[i];
+    
     if (child->Valid()) {
       if (smallest == NULL) {
         smallest = child;
-      } else if (comparator_->Compare(child->key(), smallest->key()) < 0) {
+      }
+      /*
+      else if(comparator_->Compare(child->key(), smallest->key()) ==0)
+      {
+          child->Next();
+      }
+      */
+       else if (comparator_->Compare(child->key(), smallest->key()) < 0) {
         smallest = child;
       }
     }

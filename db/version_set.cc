@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
+
 #include "db/version_set.h"
 
 #include <algorithm>
@@ -405,6 +406,7 @@ Status Version::Get(const ReadOptions& options,
       saver.ucmp = ucmp;
       saver.user_key = user_key;
       saver.value = value;
+      //printf("get: %d\n",f->number);
       s = vset_->table_cache_->Get(options, f->number, f->file_size,
                                    ikey, &saver, SaveValue);
       if (!s.ok()) {
@@ -744,7 +746,7 @@ class VersionSet::Builder {
         for (uint32_t i = 1; i < v->files_[level].size(); i++) {
           const InternalKey& prev_end = v->files_[level][i-1]->largest;
           const InternalKey& this_begin = v->files_[level][i]->smallest;
-          if (vset_->icmp_.Compare(prev_end, this_begin) >= 0) {
+          if (vset_->icmp_.Compare(prev_end, this_begin) > 0) {
             fprintf(stderr, "overlapping ranges in same level %s vs. %s\n",
                     prev_end.DebugString().c_str(),
                     this_begin.DebugString().c_str());
@@ -763,8 +765,8 @@ class VersionSet::Builder {
       std::vector<FileMetaData*>* files = &v->files_[level];
       if (level > 0 && !files->empty()) {
         // Must not overlap
-        assert(vset_->icmp_.Compare((*files)[files->size()-1]->largest,
-                                    f->smallest) < 0);
+        //assert(vset_->icmp_.Compare((*files)[files->size()-1]->largest,
+                                    //f->smallest) < 0);
       }
       f->refs++;
       files->push_back(f);
@@ -1189,6 +1191,7 @@ void VersionSet::AddLiveFiles(std::set<uint64_t>* live) {
     for (int level = 0; level < config::kNumLevels; level++) {
       const std::vector<FileMetaData*>& files = v->files_[level];
       for (size_t i = 0; i < files.size(); i++) {
+       // printf("add number:%d\n",files[i]->number);
         live->insert(files[i]->number);
       }
     }
@@ -1264,7 +1267,16 @@ Iterator* VersionSet::MakeInputIterator(Compaction* c) {
   // we will make a concatenating iterator per level.
   // TODO(opt): use concatenating iterator for level-0 if there is no overlap
   const int space = (c->level() == 0 ? c->inputs_[0].size() + 1 : 2);
-  Iterator** list = new Iterator*[space];
+  Iterator ** list;
+  if(DEBUG)
+  {
+    printf("size : %d %d\n",sizetemp,space);
+    list = new Iterator*[space+sizetemp];
+  }
+  else
+  {
+    list = new Iterator*[space];
+  }
   int num = 0;
   for (int which = 0; which < 2; which++) {
     if (!c->inputs_[which].empty()) {
@@ -1282,9 +1294,33 @@ Iterator* VersionSet::MakeInputIterator(Compaction* c) {
       }
     }
   }
-  assert(num <= space);
-  Iterator* result = NewMergingIterator(&icmp_, list, num);
-  delete[] list;
+  
+  Iterator * result;
+  if(DEBUG)
+  {
+   
+   LiuCache p = temphead;
+   while(p->next)
+   {
+      p = p->next;
+      list[num++] = p->biter;   
+   }
+   printf("%d %d %d\n",num,space,sizetemp);
+   assert(num <= space+sizetemp);
+   result = NewMergingIterator(&icmp_, list, num);
+   DeleteHead(temphead);
+   if(temphead->next==NULL)
+      printf("delete\n");
+  }
+  else
+  {
+    assert(num <= space);
+    result = NewMergingIterator(&icmp_, list, num);
+    delete[] list;
+  }
+  for (result->SeekToFirst(); result->Valid(); result->Next()) {
+    //printf("result: %s\n",result->key().ToString().c_str());
+  }
   return result;
 }
 

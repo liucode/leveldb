@@ -14,6 +14,7 @@
 
 #ifndef STORAGE_LEVELDB_DB_VERSION_SET_H_
 #define STORAGE_LEVELDB_DB_VERSION_SET_H_
+#include "liu.h"
 
 #include <map>
 #include <set>
@@ -58,6 +59,7 @@ extern bool SomeFileOverlapsRange(
 
 class Version {
  public:
+  
   // Append to *iters a sequence of iterators that will
   // yield the contents of this Version when merged together.
   // REQUIRES: This version has been saved (see VersionSet::SaveTo)
@@ -164,6 +166,7 @@ class Version {
 
 class VersionSet {
  public:
+  LiuCache head;
   VersionSet(const std::string& dbname,
              const Options* options,
              TableCache* table_cache,

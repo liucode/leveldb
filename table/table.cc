@@ -88,6 +88,45 @@ Status Table::Open(const Options& options,
   return s;
 }
 
+
+Iterator** Table::ReadLiuBlock(){
+  Iterator* iter = rep_->index_block->NewIterator(rep_->options.comparator);
+  int space = ReadLiuBlockNum();
+  Iterator** list = new Iterator*[space];
+  int num = 0;
+  for(iter->SeekToFirst(); iter->Valid(); iter->Next()){
+    //printf("%s %s\n",iter->key().ToString().c_str(),iter->value().ToString().c_str());
+    Slice handle_value = iter->value();
+    BlockHandle handle;
+    leveldb::Status s = handle.DecodeFrom(&handle_value);
+    BlockContents contents;
+    ReadOptions readoptions;
+    leveldb::Status srb = ReadBlock(const_cast<Table*>(this)->rep_->file,readoptions, handle,&contents);
+    Block* block = NULL;
+    block = new Block(contents);
+    if(block!=NULL)
+      {
+        Iterator* biter = block->NewIterator(rep_->options.comparator);
+      //for(biter->SeekToFirst(); biter->Valid(); biter->Next()){
+       //printf("lcy::%s %s\n",biter->key().ToString().c_str(),biter->value().ToString().c_str());
+    //}
+        list[num++] = biter;
+      }
+  }
+  return list;
+}
+
+int  Table::ReadLiuBlockNum()
+{
+    Iterator* iter = rep_->index_block->NewIterator(rep_->options.comparator);
+    int space=0;
+    for(iter->SeekToFirst(); iter->Valid(); iter->Next())
+    {
+    space++;
+    }
+    printf("space: %d\n",space);
+    return space;
+}
 void Table::ReadMeta(const Footer& footer) {
   if (rep_->options.filter_policy == NULL) {
     return;  // Do not need any metadata
@@ -206,6 +245,11 @@ Iterator* Table::BlockReader(void* arg,
   Iterator* iter;
   if (block != NULL) {
     iter = block->NewIterator(table->rep_->options.comparator);
+    //printf("input:%s\n",input.ToString().c_str());
+    //for(iter->SeekToFirst(); iter->Valid(); iter->Next()){
+      //  printf("liuchunyi123::%s %s\n",iter->key().ToString().c_str(),iter->value().ToString().c_str());
+     //}
+
     if (cache_handle == NULL) {
       iter->RegisterCleanup(&DeleteBlock, block, NULL);
     } else {

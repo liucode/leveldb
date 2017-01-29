@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
+#include "db/liu.h"
+
 #include "leveldb/table_builder.h"
 
 #include <assert.h>
@@ -90,11 +92,25 @@ Status TableBuilder::ChangeOptions(const Options& options) {
 }
 
 void TableBuilder::Add(const Slice& key, const Slice& value) {
+  if(DEBUG)
+  {
+    if(flushflag == true)
+    {
+      if(rep_!=NULL)
+       {
+        printf("flush\n");
+         Flush();
+        }
+        return;
+    }
+  }
   Rep* r = rep_;
   assert(!r->closed);
   if (!ok()) return;
   if (r->num_entries > 0) {
-    assert(r->options.comparator->Compare(key, Slice(r->last_key)) > 0);
+      if(r->options.comparator->Compare(key, Slice(r->last_key)) == 0)
+        return;
+      assert(r->options.comparator->Compare(key, Slice(r->last_key)) > 0);
   }
 
   if (r->pending_index_entry) {
@@ -123,6 +139,15 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
 void TableBuilder::Flush() {
   Rep* r = rep_;
   assert(!r->closed);
+  if(DEBUG)
+  {
+    const size_t estimated_block_size = r->data_block.CurrentSizeEstimate();
+    if(flushflag&&estimated_block_size < r->options.block_size)
+        {
+          liublocksize+= (r->options.block_size-estimated_block_size);
+          printf("blocksize:%d\n",liublocksize);
+        }
+  }
   if (!ok()) return;
   if (r->data_block.empty()) return;
   assert(!r->pending_index_entry);

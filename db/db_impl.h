@@ -5,6 +5,7 @@
 #ifndef STORAGE_LEVELDB_DB_DB_IMPL_H_
 #define STORAGE_LEVELDB_DB_DB_IMPL_H_
 
+#include "liu.h"
 #include <deque>
 #include <set>
 #include "db/dbformat.h"
@@ -46,7 +47,8 @@ class DBImpl : public DB {
 
   // Compact any files in the named level that overlap [*begin,*end]
   void TEST_CompactRange(int level, const Slice* begin, const Slice* end);
-
+  int markbitmap(Iterator *iter1, Iterator* iter2);
+  bool FindLiuKey(Slice key,LiuCache head);
   // Force current memtable contents to be compacted.
   Status TEST_CompactMemTable();
 
