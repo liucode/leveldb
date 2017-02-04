@@ -740,7 +740,7 @@ class VersionSet::Builder {
         MaybeAddFile(v, level, *base_iter);
       }
 
-#ifndef NDEBUG
+#ifndef N
       // Make sure there is no overlap in levels > 0
       if (level > 0) {
         for (uint32_t i = 1; i < v->files_[level].size(); i++) {
@@ -1266,17 +1266,10 @@ Iterator* VersionSet::MakeInputIterator(Compaction* c) {
   // Level-0 files have to be merged together.  For other levels,
   // we will make a concatenating iterator per level.
   // TODO(opt): use concatenating iterator for level-0 if there is no overlap
+  /*
   const int space = (c->level() == 0 ? c->inputs_[0].size() + 1 : 2);
-  Iterator ** list;
-  if(DEBUG)
-  {
-    printf("size : %d %d\n",sizetemp,space);
-    list = new Iterator*[space+sizetemp];
-  }
-  else
-  {
-    list = new Iterator*[space];
-  }
+  Iterator** list = new Iterator*[space];
+
   int num = 0;
   for (int which = 0; which < 2; which++) {
     if (!c->inputs_[which].empty()) {
@@ -1295,32 +1288,20 @@ Iterator* VersionSet::MakeInputIterator(Compaction* c) {
     }
   }
   
-  Iterator * result;
-  if(DEBUG)
-  {
-   
-   LiuCache p = temphead;
-   while(p->next)
-   {
-      p = p->next;
-      list[num++] = p->biter;   
-   }
-   printf("%d %d %d\n",num,space,sizetemp);
-   assert(num <= space+sizetemp);
-   result = NewMergingIterator(&icmp_, list, num);
-   DeleteHead(temphead);
-   if(temphead->next==NULL)
-      printf("delete\n");
-  }
-  else
-  {
+
     assert(num <= space);
-    result = NewMergingIterator(&icmp_, list, num);
+  */
+    Iterator** list = new Iterator*[sizetemp];
+    LiuCache p = overlist->head;
+    int num = 0;
+    while(p)
+    {
+      list[num++] = p->biter;
+      p = p->next;
+    }
+    printf("num sizetemp:%d %d\n",num,sizetemp);
+    Iterator* result = NewMergingIterator(&icmp_, list, num);
     delete[] list;
-  }
-  for (result->SeekToFirst(); result->Valid(); result->Next()) {
-    //printf("result: %s\n",result->key().ToString().c_str());
-  }
   return result;
 }
 

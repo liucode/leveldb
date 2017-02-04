@@ -6,6 +6,7 @@
 #define STORAGE_LEVELDB_DB_DB_IMPL_H_
 
 #include "liu.h"
+#include "map"
 #include <deque>
 #include <set>
 #include "db/dbformat.h"

@@ -1,6 +1,7 @@
 #define DEBUG true
 #include "malloc.h"
 #include "leveldb/iterator.h"
+#include <map>
 namespace leveldb {
 
 #ifndef FUN_H
@@ -11,23 +12,41 @@ struct liucache
 {
   Iterator * biter;
   LiuCache next;
-  int flag;
-  int number;
+  Slice *small;
+  Slice *large;
 };
-#endif
-extern int liublocksize;
-extern LiuCache head;
-extern bool firstflag;
 
+typedef struct liucachelist *LiuCacheList;
+
+struct liucachelist
+{
+  LiuCache head;
+  LiuCache tail;
+};
+
+
+#endif
+extern Slice *inputlast;
+extern Slice *lastkey;
+extern Slice *smallblock;
+extern LiuCacheList filelist;
+extern std::map<int,LiuCacheList> filemata;
+extern int liublocksize;
+extern LiuCacheList memlist;
+extern bool firstflag;
+extern std::map<std::string,LiuCache> largemap; 
 extern bool flushflag;
 extern int sizecache;
-extern LiuCache temphead;
+extern LiuCacheList overlist;
 extern int sizetemp;
 extern bool smallflag;
-
-void PrintHead(LiuCache temphead);
+void PrintSize(LiuCacheList list);
+void PrintList(LiuCacheList list);
+void AddLiuCacheshen(LiuCacheList list,LiuCache newnode);
 void DeleteHead(LiuCache head);
-void InitLiuCache(LiuCache head);
-void AddLiuCache(LiuCache head,Iterator* iter);
-void CheckValid();
+void AddLiuCacheList(LiuCacheList list,LiuCache newnode);
+LiuCache InitLiuCache(LiuCache newnode,Iterator* iter);
+void AddLiuIterList(LiuCacheList list,Iterator* iter);
+void CheckList(LiuCacheList list);
+void WriteList(LiuCacheList list,FILE *fp);
 }

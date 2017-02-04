@@ -1,7 +1,7 @@
 // Copyright (c) 2011 The LevelDB Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
-
+#include "db/liu.h"
 #include "leveldb/table.h"
 
 #include "leveldb/cache.h"
@@ -89,13 +89,12 @@ Status Table::Open(const Options& options,
 }
 
 
-Iterator** Table::ReadLiuBlock(){
+Iterator** Table::ReadLiuBlock(int filenum){
   Iterator* iter = rep_->index_block->NewIterator(rep_->options.comparator);
   int space = ReadLiuBlockNum();
   Iterator** list = new Iterator*[space];
   int num = 0;
   for(iter->SeekToFirst(); iter->Valid(); iter->Next()){
-    //printf("%s %s\n",iter->key().ToString().c_str(),iter->value().ToString().c_str());
     Slice handle_value = iter->value();
     BlockHandle handle;
     leveldb::Status s = handle.DecodeFrom(&handle_value);
@@ -107,12 +106,20 @@ Iterator** Table::ReadLiuBlock(){
     if(block!=NULL)
       {
         Iterator* biter = block->NewIterator(rep_->options.comparator);
-      //for(biter->SeekToFirst(); biter->Valid(); biter->Next()){
-       //printf("lcy::%s %s\n",biter->key().ToString().c_str(),biter->value().ToString().c_str());
-    //}
         list[num++] = biter;
       }
   }
+  std::map<int,LiuCacheList>::iterator it= filemata.find(filenum); 
+  if(it == filemata.end()) {
+  LiuCacheList templist = (LiuCacheList)malloc(sizeof(struct liucachelist));
+  templist->head = NULL;
+  for(int i=0;i<space;i++)
+  {
+     AddLiuIterList(templist,list[i]);
+  }
+  
+    filemata.insert(std::pair<int,LiuCacheList>(filenum,templist));
+}
   return list;
 }
 
@@ -122,7 +129,7 @@ int  Table::ReadLiuBlockNum()
     int space=0;
     for(iter->SeekToFirst(); iter->Valid(); iter->Next())
     {
-    space++;
+        space++;
     }
     printf("space: %d\n",space);
     return space;

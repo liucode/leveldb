@@ -18,8 +18,8 @@ char *rand_str(char *str,const int len)
  
 int main(int argc,char** argv)
 {
-  int loop =100000;
-  std::string data[10];
+  int loop =1000000;
+  std::string data[1000];
   leveldb::DB *db;
   leveldb::Options options;
   //if(argc<=1)
@@ -46,16 +46,16 @@ int main(int argc,char** argv)
     srand(i);
     char name[4000+1];
     int len = (rand() % (4000-1))+ 1;
-    rand_str(name,len);
+    rand_str(name,400);
     std::string temp = name;
-    std::string s = to_string(len);
+    std::string s = to_string(i);
     s.append(temp);
     leveldb::Status status=db->Put(write_options,s,s);
-    if(i<10)
+    if(i<1000)
     data[i] = s;
     if (!status.ok()) cerr << status.ToString() << endl;
   }
-
+/*
   for(i=2;i<5;i+=2)
   {
     srand(i);
@@ -68,12 +68,12 @@ int main(int argc,char** argv)
     leveldb::Status status=db->Delete(leveldb::WriteOptions(),s);
     if (!status.ok()) cerr << status.ToString() << endl;
   }
-  
+  */
   printf("start Compact\n");
   compacts=clock();
   db->CompactRange(NULL,NULL);
   before = clock();
- 
+/* 
   for(i=3;i<loop;i+=1000)
   {
      srand(i);
@@ -83,21 +83,20 @@ int main(int argc,char** argv)
      std::string temp = name;
      std::string s = to_string(len);
      s.append(temp);
-     if(i<10)
+     if(i<1000)
      data[i] = s;
      leveldb::Status status=db->Put(write_options,s,s);
      if (!status.ok()) cerr << status.ToString() << endl;
    }
-  
+  */
   after = clock();
 db->CompactRange(NULL,NULL);
-for(i=1;i<5;i++){
+for(i=1;i<10;i++){
    leveldb::Status status=db->Get(leveldb::ReadOptions(),data[i],&value);
    ends = clock();
-      cout<<data[i]<<endl;
     if(status.ok())
       {
-        cout<<"ok get"<<endl;
+        cout<<"ok"<<value<<endl;
         if(value.at(0)=='l')
         {
           count++;

@@ -92,18 +92,16 @@ Status TableBuilder::ChangeOptions(const Options& options) {
 }
 
 void TableBuilder::Add(const Slice& key, const Slice& value) {
-  if(DEBUG)
+ //
+  if(flushflag&&!smallflag)
   {
-    if(flushflag == true)
-    {
-      if(rep_!=NULL)
-       {
-        printf("flush\n");
-         Flush();
-        }
-        return;
-    }
+    char *str = (char*)malloc(key.size());
+    memcpy(str,key.data(),key.size());
+    Slice *tempstr = new Slice(str,key.size());
+    smallblock = (Slice*)tempstr;
+    smallflag = true;
   }
+ 
   Rep* r = rep_;
   assert(!r->closed);
   if (!ok()) return;
@@ -125,27 +123,49 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
   if (r->filter_block != NULL) {
     r->filter_block->AddKey(key);
   }
-
   r->last_key.assign(key.data(), key.size());
   r->num_entries++;
   r->data_block.Add(key, value);
-
+ if(flushflag)
+  {   
+  int flushliu = 0;
+  std::map<std::string,LiuCache> ::iterator it= largemap.find(key.data()); 
+  if(it != largemap.end()) {//get
+        flushliu =1;
+        printf("liu flush\n");
+        largemap.erase(it);
+  }
   const size_t estimated_block_size = r->data_block.CurrentSizeEstimate();
   if (estimated_block_size >= r->options.block_size) {
-    Flush();
+      Flush();
+  }
+  else if(flushliu==1)
+    {
+      Flush();
+    }
+    else
+    {
+    }
+  }
+  else
+  {
+      const size_t estimated_block_size = r->data_block.CurrentSizeEstimate();
+      if (estimated_block_size >= r->options.block_size) {
+      Flush();
+      }
   }
 }
 
 void TableBuilder::Flush() {
-  Rep* r = rep_;
+  Rep* r = rep_;   
   assert(!r->closed);
-  if(DEBUG)
+  if(flushflag)
   {
     const size_t estimated_block_size = r->data_block.CurrentSizeEstimate();
     if(flushflag&&estimated_block_size < r->options.block_size)
         {
           liublocksize+= (r->options.block_size-estimated_block_size);
-          printf("blocksize:%d\n",liublocksize);
+          //printf("blocksize:%d\n",liublocksize);
         }
   }
   if (!ok()) return;
@@ -156,9 +176,24 @@ void TableBuilder::Flush() {
     r->pending_index_entry = true;
     r->status = r->file->Flush();
   }
+  else
+  {
+      printf("error5n");
+      exit(0);
+  }
   if (r->filter_block != NULL) {
     r->filter_block->StartBlock(r->offset);
   }
+  if(flushflag&&r->num_entries!=0)
+  {
+    smallflag = false;
+    LiuCache temp = (LiuCache)malloc(sizeof(struct liucache));
+    temp->small = smallblock;
+    temp->large = lastkey;
+    temp->biter = NULL;
+    AddLiuCacheList(filelist,temp);
+  }
+
 }
 
 void TableBuilder::WriteBlock(BlockBuilder* block, BlockHandle* handle) {
@@ -223,6 +258,8 @@ Status TableBuilder::status() const {
 
 Status TableBuilder::Finish() {
   Rep* r = rep_;
+  
+  printf("finish flush\n");
   Flush();
   assert(!r->closed);
   r->closed = true;
