@@ -521,7 +521,6 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
     if (base != NULL) {
       level = base->PickLevelForMemTableOutput(min_user_key, max_user_key);
     }
-    level = 0;
     edit->AddFile(level, meta.number, meta.file_size,
                   meta.smallest, meta.largest);
   }
@@ -835,98 +834,89 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
   } else {
     compact->builder->Abandon();
   }
-  LiuCache p,q;
-  LiuCacheList outlist = (LiuCacheList)malloc(sizeof(struct liucachelist));
-  outlist->head = NULL;
-  if(memlist!=NULL)
-  {
-    p = memlist->head;
-  }
-  else
-  {
-    p = NULL;
-  }
-  if(filelist!=NULL)
-  {
-    q = filelist->head;
-  }
-  else
-  {
-    q =NULL;
-  }
-  PrintSize(filelist);
-  FILE *ffp =fopen("filelist","w");
-  WriteList(filelist,ffp);
-  LiuCache pnext,qnext;
-  int numq =0 ;
-  int lastflag = 0;
-  while(p&&q)
-  {
-      numq++;
-      if(p->large->compare(*q->small)<0)
-      {
-          
-          pnext = p->next;
-          AddLiuCacheList(outlist,p);
-          p = pnext;
-      }
-    else if(q->large->compare(*p->small)<0)
-     {
-          if(q->large->compare(*inputlast)==0)
-              lastflag =1;
-          qnext = q->next;
-          AddLiuCacheList(outlist,q);
-          q = qnext;
-     }
-    else
-    {
-           printf("error!\n");
-          exit(0);
-    }
-  }
-  if(q==NULL)
-  {
-    if(lastflag ==1)
-    {
-      printf("last\n");
-      outlist->tail->next= p;
-      outlist->tail = memlist->tail;
-      memlist->head = NULL;
-    }
-    else
-    {
-    if(numq!=0)
-      memlist->head = p;
-    else
-    {
-      printf("in numq = 0\n");
-      if(sizetemp!=0)
-      {
-        outlist->head = NULL;
-        return Status::OK();
-      }
-      else
-      {
-        outlist = memlist;
-      }
-    }
-    }
-  }
-  if(p==NULL)
-  {
-    printf("shen\n");
-    AddLiuCacheshen(outlist,q);
-    memlist->head = NULL;
-  }
-  filemata.insert(std::pair<int,LiuCacheList>(output_number,outlist));
-  printf("out:%d \n",output_number);
-  PrintSize(outlist);
-  PrintSize(memlist);
-  filelist->head = NULL;
-  compact->current_output()->smallest.DecodeFrom(*outlist->head->small); 
-  compact->current_output()->largest.DecodeFrom(*outlist->tail->large); 
- 
 
+//Finish会把最后一个块刷下去
+       /*FILE *ffp = fopen("filelist","w");
+       WriteList(filelist,ffp);
+       FILE *mfp = fopen("memlist","w");
+       WriteList(memlist,mfp);
+       */
+       LiuCache filecache = filelist->head;
+       LiuCache memcache = memlist->head;
+       while(filecache)
+       {   
+           LiuCache mnext,fnext;
+           while(memcache&&filecache)
+           {
+                if(memcache->large->compare(*filecache->small)<0)
+               {
+                   mnext = memcache->next;
+                   AddLiuCacheList(outlist,memcache,1);
+                   memcache = mnext;
+               }//if
+               else if(filecache->large->compare(*memcache->small)<0)
+               {
+                      fnext = filecache->next;
+                      AddLiuCacheList(outlist,filecache,1);
+                      if(inputlast->compare(*filecache->large) == 0)
+                      {
+                            lastflag = 1;
+                      }
+                      filecache = fnext;    
+               }
+               else
+               {
+                  printf("error filecache 868\n");
+                  exit(0);
+               }
+          }//while
+          if(memcache ==NULL)
+                break;
+      }//whilefilecache
+          if(memcache == NULL&&filecache!=NULL)
+          {
+              AddLiuCacheshen(outlist,filecache);
+              memlist->head = NULL;
+              memlist->tail =NULL;
+          }
+          if(filecache==NULL&&memcache!=NULL)
+          {
+            if(lastflag == 1)
+            {
+                if(outlist->head ==NULL)
+                {
+                    outlist->head = memlist->head;
+                    outlist->tail = memlist->tail;
+                }
+                else
+                {
+                   AddLiuCacheshen(outlist,memcache);
+                   printf("lastflag 2\n");
+                }
+                memcache = NULL;
+                memlist->head = NULL;
+            }
+            else 
+            {
+                memlist->head = memcache;
+            }
+          }
+    if(outlist->head!=NULL)
+    {
+    filelist->head = NULL;
+    filelist->tail = NULL;
+    compact->current_output()->smallest.DecodeFrom(*outlist->head->small); 
+    compact->current_output()->largest.DecodeFrom(*outlist->tail->large); 
+    std::string st = outlist->head->small->data();
+    std::string lt = outlist->tail->large->data();
+    PrintSize(outlist);
+    filemata.insert(std::pair<int,LiuCacheList>(output_number,outlist));
+    printf("%c%c%c%c%c and %c%c%c%c%c\n",st[0],st[1],st[2],st[3],st[4],lt[0],lt[1],lt[2],lt[3],lt[4]);
+    printf("out:%d\n",output_number);
+    }
+    outlist = (LiuCacheList)malloc(sizeof(struct liucachelist)); 
+    outlist->head =NULL;
+    outlist->tail =NULL;
   const uint64_t current_bytes = compact->builder->FileSize();
   compact->current_output()->file_size = current_bytes;
   compact->total_bytes += current_bytes;
@@ -1019,23 +1009,6 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
     int len[totalnuminput];
     int filenumber[totalnuminput];
     int num = 0;
-   //获取文件最大和最小值，防止出现双空文件，不知道文件的元数据大小
-    std::string lius,liul;
-    lius = compact->compaction->input(0,0)->smallest.DebugString();
-    liul = compact->compaction->input(0,0)->largest.DebugString();
-     for(i=0;i<2;i++)
-       for(j=0;j<compact->compaction->num_input_files(i);j++)
-         {
-          FileMetaData * fmd = compact->compaction->input(i,j);
-          Slice tempsmall(fmd->smallest.DebugString());
-          Slice liusmall(lius);
-          if(user_comparator()->Compare(tempsmall,liusmall)<=0)
-                  lius = fmd->smallest.DebugString();
-           Slice templarge(fmd->largest.DebugString());
-           Slice liularge(liul);
-           if(user_comparator()->Compare(templarge,liularge)>=0)
-                  liul = fmd->largest.DebugString();
-         }
     
     std::map<std::string,int> smallsort0,smallsort1;
     //获取块级别信息到list中
@@ -1045,6 +1018,8 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
           FileMetaData * fmd = compact->compaction->input(i,j);
           std::string fname = TableFileName(dbname_, fmd->number);
           printf("in:%d\n",fmd->number);   
+          if(fmd->number == 60)
+                int h=0;
           RandomAccessFile* file = NULL;
           Table* table = NULL;
           BlockHandle handle;
@@ -1091,14 +1066,10 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
           }
         }//for
       
-      //是否出现全空文件
-      int nodo=0;
-      for(i=0;i<totalnuminput;i++)
-          nodo+=len[i];
-      //p q两
+      //p q两层
+      //将文件放入map中排序
       LiuCacheList plist = NULL;
       std::map<std::string,int>::iterator siter;
-      i = 0;
       for (siter = smallsort0.begin(); siter != smallsort0.end(); siter++ ) {
            if(plist ==NULL)
             {
@@ -1106,6 +1077,11 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
             }
             else
             {
+                if(plist->tail->large->compare(*(filemata[siter->second]->head->small))>0)
+                {
+                    printf("error plist\n");
+                    exit(0);
+                }
                 LiuCacheList templist = filemata[siter->second];
                 plist->tail->next = filemata[siter->second]->head;
                 plist->tail = filemata[siter->second]->tail;
@@ -1120,14 +1096,18 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
             }
              else
             {
+                 if(qlist->tail->large->compare(*(filemata[siter->second]->head->small))>0)
+                 {
+                      printf("error qlist\n");
+                      exit(0);
+                 }
                  qlist->tail->next = filemata[siter->second]->head;
-                LiuCacheList liutaillist = filemata[siter->second];
+                 LiuCacheList liutaillist = filemata[siter->second];
                  qlist->tail = filemata[siter->second]->tail;
             }
        }
 
-      //合并p，q
-      int mergeflag = 0;
+      //合并p，q,相关初始化
       LiuCache p,q,pnext,qnext;
       if(plist!=NULL)
         p = plist->head;
@@ -1153,12 +1133,17 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
         overlist = (LiuCacheList)malloc(sizeof(struct liucachelist));
       }
       memlist->head = NULL;
+      memlist->tail =NULL;
       overlist->head = NULL;
+      overlist->tail =NULL;
       if(filelist==NULL)
       {
         filelist = (LiuCacheList)malloc(sizeof(struct liucachelist));
       }
-      if(plist!=NULL)
+      outlist  = (LiuCacheList)malloc(sizeof(struct liucachelist));
+      outlist->head =NULL;
+      outlist->tail =NULL;
+      /*if(plist!=NULL)
       {
         FILE *pfp = fopen("plist","w");
         WriteList(plist,pfp);
@@ -1168,11 +1153,13 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
         FILE *qfp = fopen("qlist","w");
         WriteList(qlist,qfp);
       }
+      */
       filelist->head = NULL;
+      filelist->tail = NULL;
+
+      sizetemp = 0;//记录有多少块存在于文件中
       
-      sizetemp = 0;
-      Slice *smallstr = NULL;
-      Slice *largestr = NULL;
+      //两个顺序链表合并,需要留出空隙的块记录在largemap中
       int flagp = 0;
       int flagq = 0;
       while(p&&q)
@@ -1183,19 +1170,19 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
           {
             pnext = p->next;
             sizetemp++;
-            AddLiuCacheList(overlist,p);
+            AddLiuCacheList(overlist,p,0);
             p = pnext;
             flagp =0;
           }
           else
           {
-              if(largestr!=NULL)
+              if(overlist->tail!=NULL)
               {
-                  largemap.insert(std::pair<std::string,LiuCache>(largestr->data(),p));
-                  largestr = NULL;
+                 std::string so = std::string(overlist->tail->large->data(),overlist->tail->large->size()-8);
+                 largemap.insert(std::pair<std::string,LiuCache>(so,p));
               }
               pnext = p->next;
-              AddLiuCacheList(memlist,p);
+              AddLiuCacheList(memlist,p,1);
               p = pnext;
           }
         }
@@ -1205,19 +1192,19 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
           {
               qnext = q->next;
               sizetemp++;
-              AddLiuCacheList(overlist,q);
+              AddLiuCacheList(overlist,q,0);
               q = qnext;
               flagq =0;
           }
           else
           {
-            if(largestr!=NULL)
+            if(overlist->tail!=NULL)
             {
-                largemap.insert(std::pair<std::string,LiuCache>(largestr->data(),q));
-                largestr = NULL;
+                std::string so = std::string(overlist->tail->large->data(),overlist->tail->large->size()-8); 
+                largemap.insert(std::pair<std::string,LiuCache>(so,q));
             }
             qnext = q->next;
-            AddLiuCacheList(memlist,q);
+            AddLiuCacheList(memlist,q,1);
             q = qnext;
           }
         }
@@ -1227,21 +1214,19 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
           {
               qnext = q->next;
               sizetemp++;
-              AddLiuCacheList(overlist,q);
+              AddLiuCacheList(overlist,q,0);
               q = qnext;
               flagp = 1;
               flagq =0;
-              largestr = p->large;
           }
           else
           {
               pnext = p->next;
               sizetemp++;
-              AddLiuCacheList(overlist,p);
+              AddLiuCacheList(overlist,p,0);
               p = pnext;
               flagp = 0;
               flagq = 1;
-              largestr = q->large;
           }
         }
       }
@@ -1254,8 +1239,9 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
          {
             pnext = p->next;
             sizetemp++;
-            largemap.insert(std::pair<std::string,LiuCache>(p->large->data(),pnext));
-            AddLiuCacheList(overlist,p);
+            AddLiuCacheList(overlist,p,0);
+            std::string so = std::string(overlist->tail->large->data(),overlist->tail->large->size()-8);  
+            largemap.insert(std::pair<std::string,LiuCache>(so,pnext));
             AddLiuCacheshen(memlist,pnext); 
          }
       }
@@ -1267,12 +1253,13 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
           {
               qnext = q->next;
               sizetemp++;
-              largemap.insert(std::pair<std::string,LiuCache>(q->large->data(),qnext));
-              AddLiuCacheList(overlist,q);
+              AddLiuCacheList(overlist,q,0);
+              std::string so = std::string(overlist->tail->large->data(),overlist->tail->large->size()-8);  
+              largemap.insert(std::pair<std::string,LiuCache>(so,qnext));
               AddLiuCacheshen(memlist,qnext); 
           }
       }
-      if(memlist!=NULL)
+     /*if(memlist!=NULL)
       {
         FILE *mfp = fopen("memlist","w");
         WriteList(memlist,mfp);
@@ -1282,6 +1269,8 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       FILE *ofp = fopen("overlist","w");
       WriteList(overlist,ofp);
       }
+     */
+      //防止出现文件没有排序，将文件放入
       for(i=0;i<totalnuminput;i++)
       {
         
@@ -1293,21 +1282,43 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
         }
         else
         {
-            filemata.erase(it);
+          printf("del filenumber %d\n",filenumber[i]);  
+          filemata.erase(it);
         }
       }
-  flushflag = true;
-  Iterator* input = versions_->MakeInputIterator(compact->compaction);   
-  if(sizetemp ==0)
+  std::map<std::string,LiuCache> ::iterator lait;
+  FILE *lafp = fopen("largemap","w");
+  for(lait=largemap.begin();lait!=largemap.end();lait++)
   {
-      printf("sizetemp==0\n");
-      OpenCompactionOutputFile(compact);
-      compact->current_output()->smallest.DecodeFrom(*memlist->head->small);
-      compact->current_output()->largest.DecodeFrom(*memlist->tail->large);
-      FinishCompactionOutputFile(compact, input);
-       compact->builder = NULL;
+      fprintf(lafp,"%s\n",lait->first.c_str());
   }
-  //CheckValid();
+  flushflag = true;//防止合并的时候写入0层文件
+  Iterator* input = versions_->MakeInputIterator(compact->compaction);   
+  int blocknum =0;//标记每个文件真实大小：内存块数+文件实际块数
+  lastflag = 0;//出现最后一个块
+  //数据全部在内存中，overlist为空
+  if(sizetemp ==0)
+   {
+       printf("sizetemp==0\n");
+       LiuCache memcache = memlist->head;
+       while(memcache)
+       {
+           LiuCache mnext;     
+           OpenCompactionOutputFile(compact);
+           while(blocknum<=BLOCKS&&memcache)
+           {
+            blocknum++;
+            mnext = memcache->next;
+            AddLiuCacheList(outlist,memcache,1);
+            memcache = mnext;
+           }//while block
+           memlist->head = memcache;//防止进入完成检查，重新刷入内存中数据
+           FinishCompactionOutputFile(compact, input);//直接返回，直到memcache为空
+           blocknum = 0;//重置计数器
+       }//while memcache
+  }//if
+          
+  //记录最后一个key值
   input->SeekToLast();
   if(input->Valid())
   {
@@ -1316,7 +1327,9 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
     memcpy(inputstr,inputtempstr.data(),input->key().size());  
     Slice* slicinput = new Slice(inputstr,input->key().size());
     inputlast = slicinput;
+    lastflag = 0;
   }
+  
   input->SeekToFirst();
   Status status;
   ParsedInternalKey ikey;
@@ -1337,12 +1350,8 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
     }
 
     Slice key = input->key();
-    //std::string h = key.data();
-    //printf("key3 %c%c%c%c%c   ",h[0],h[1],h[2],h[3],h[4]);
-    char *lstr = (char*)malloc(key.size());
-  memcpy(lstr,key.data(),key.size());
-  Slice *templstr = new Slice(lstr,key.size());
-  lastkey = (Slice*)templstr;  
+   
+
     if (compact->compaction->ShouldStopBefore(key) &&
         compact->builder != NULL) {
         status = FinishCompactionOutputFile(compact, input);
@@ -1350,8 +1359,6 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
         break;
       }
     }
-    //printf("find:%c%c%c%c\n",key[0],key[1],key[2],key[4]); 
-    //
     bool drop =false;
     if (!ParseInternalKey(key, &ikey)) {
       // Do not hide error keys
@@ -1382,6 +1389,16 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
         //     few iterations of this loop (by rule (A) above).
         // Therefore this deletion marker is obsolete and can be dropped.
         drop = true;
+        
+        //如果删除
+        std::string delstr = std::string(key.data(),key.size()-8);
+        std::map<std::string,LiuCache> ::iterator it;
+        for(it=largemap.begin();it!=largemap.end();it++)
+        {
+            
+            if(it->first==delstr)
+              compact->builder->Flush();
+        }
       }
 
       last_sequence_for_key = ikey.sequence;
@@ -1396,34 +1413,172 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
         (int)last_sequence_for_key, (int)compact->smallest_snapshot);
 #endif
       if(!drop){ 
-      if (compact->builder == NULL) { // 第一次进入compact或者上次文件刚刚写到磁盘，新建一个文件和table_builder
+       //保存最近一个key
+       char *lstr = (char*)malloc(key.size());
+       memcpy(lstr,key.data(),key.size());
+       Slice *templstr = new Slice(lstr,key.size());
+       lastkey = (Slice*)templstr;  
+    
+    if (compact->builder == NULL) { // 第一次进入compact或者上次文件刚刚写到磁盘，新建一个文件和table_builder
         status = OpenCompactionOutputFile(compact);//新建
         if (!status.ok()) {
           break;
         }
       }
+      /*//舍弃原来标记元数据的方法
       if (compact->builder->NumEntries() == 0) {
-          compact->current_output()->smallest.DecodeFrom(key);
+          //compact->current_output()->smallest.DecodeFrom(key);
         }
-          compact->current_output()->largest.DecodeFrom(key);
+          //compact->current_output()->largest.DecodeFrom(key);*/
       compact->builder->Add(key, input->value());
-           // Close output file if it is big enough
-      if (compact->builder->FileSize() >=
+       //merge memlist and filelist
+      
+       //FILE *ffp = fopen("filelist","w");
+       //WriteList(filelist,ffp);
+       /*FILE *mfp = fopen("memlist","w");
+       WriteList(memlist,mfp);
+       */
+       //每当有块刷下时，检查是否需要形成文件 
+       LiuCache filecache = filelist->head;
+       LiuCache memcache = memlist->head;
+       while(filecache)
+       {
+          LiuCache mnext,fnext;
+           while(memcache&&filecache)
+           {
+               blocknum++;
+               if(blocknum>=BLOCKS)
+               {
+                     if(compact->builder == NULL)
+                     OpenCompactionOutputFile(compact);
+                     break;//如果文件大小>=规定的大小，形成文件
+               }
+               if(memcache->large->compare(*filecache->small)<0)
+               {
+                   mnext = memcache->next;
+                   AddLiuCacheList(outlist,memcache,1);
+                   memcache = mnext;
+               }//if
+               else if(filecache->large->compare(*memcache->small)<0)
+               {
+                      fnext = filecache->next;
+                      if(inputlast->compare(*filecache->large) == 0)//如果出现最后一个块
+                      {
+                          lastflag =1;
+                          printf("last key3\n");
+                      }
+                      AddLiuCacheList(outlist,filecache,1);
+                      filecache = fnext;    
+               }
+               else
+               {
+                   printf("error filecache 1426\n");
+                  exit(0);
+               }
+            }//while(memcache&&filecache)
+              
+            if(memcache == NULL)//如果内存为空
+            {
+                  if(filecache->next!=NULL)
+                  {
+                      printf("error filecache\n");
+                      exit(0);
+                  }
+                  AddLiuCacheList(outlist,filecache,1);
+                  blocknum++;
+                  filelist->head = NULL;
+                  filelist->tail = NULL ;
+            }
+            if(blocknum>=BLOCKS)//如果超过限制
+            {  
+              memlist->head = memcache;
+              blocknum = 0;
+              FinishCompactionOutputFile(compact, input); 
+              memcache = memlist->head;
+              filecache = NULL;
+              filelist->head = NULL;
+                
+            }
+            else
+            {
+              memlist->head = memcache;
+              filelist->head = filecache;
+            }
+        }//whilefilecache
+
+      // Close output file if it is big enough
+        /*
+        if (compact->builder->FileSize() >=
           compact->compaction->MaxOutputFileSize()) {
-        status = FinishCompactionOutputFile(compact, input);
         if (!status.ok()) {
+        status = FinishCompactionOutputFile(compact, input);
           break;
         }
-      }
+      }*/
     }
   input->Next();
   }
 
-//  PrintList(filelist);
+   // 
+        LiuCache memcache = memlist->head;
+        LiuCache filecache = filelist->head;
+        LiuCache mnext,fnext;
+        if(memcache||filecache)
+        {
+           while(memcache&&filecache)
+           {
+              if(memcache->large->compare(*filecache->small)<0)
+               {
+                   mnext = memcache->next;
+                   AddLiuCacheList(outlist,memcache,1);
+                   memcache = mnext;
+               }//if
+               else if(filecache->large->compare(*memcache->small)<0)
+               {
+                      fnext = filecache->next;
+                      AddLiuCacheList(outlist,filecache,1);
+                      filecache = fnext;    
+               }
+               else
+               {
+                  printf("error filecache 1481\n");
+                  exit(0);
+               }
+          }//while
+          if(memcache == NULL&&filecache!=NULL)
+          {
+              AddLiuCacheshen(outlist,filecache);
+              status = FinishCompactionOutputFile(compact, input);
+              filecache = NULL;
+              filelist->head =NULL;
+              filelist->tail = NULL;
+          }
+          else if(filecache==NULL&&memcache!=NULL)
+          {
+            if(lastflag ==1)
+            {
+                printf("shen 1\n");
+                AddLiuCacheshen(outlist,memcache); 
+                memcache = NULL;
+                memlist->head =NULL;
+                memlist->tail = NULL;
+                filelist->head =NULL;
+            }
+            status = FinishCompactionOutputFile(compact, input);
+          }
+          else
+          {
+                  filelist->head =NULL;
+                  filelist->tail = NULL;
+                  memlist->head =NULL;
+                  memlist->tail = NULL;      
+          }
+        }//if ||
+    
   if (status.ok() && shutting_down_.Acquire_Load()) {
     status = Status::IOError("Deleting DB during compaction");
   }
-  if (status.ok() && compact->builder != NULL) {
+  if (lastflag!=1&&status.ok() && compact->builder != NULL) {
     status = FinishCompactionOutputFile(compact, input);
   }
   if (status.ok()) {
@@ -1431,7 +1586,14 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   }
   delete input;
   input = NULL;
+  
 
+  //delete largemap
+  std::map<std::string,LiuCache> ::iterator it;
+  for(it=largemap.begin();it!=largemap.end();it++)
+  {
+      largemap.erase(it);
+  }
   CompactionStats stats;
   stats.micros = env_->NowMicros() - start_micros - imm_micros;
   for (int which = 0; which < 2; which++) {

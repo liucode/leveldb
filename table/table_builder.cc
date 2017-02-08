@@ -129,11 +129,11 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
  if(flushflag)
   {   
   int flushliu = 0;
-  std::map<std::string,LiuCache> ::iterator it= largemap.find(key.data()); 
+  std::string so = std::string(key.data(),key.size()-8);
+  std::map<std::string,LiuCache> ::iterator it= largemap.find(so); 
   if(it != largemap.end()) {//get
         flushliu =1;
         printf("liu flush\n");
-        largemap.erase(it);
   }
   const size_t estimated_block_size = r->data_block.CurrentSizeEstimate();
   if (estimated_block_size >= r->options.block_size) {
@@ -191,7 +191,7 @@ void TableBuilder::Flush() {
     temp->small = smallblock;
     temp->large = lastkey;
     temp->biter = NULL;
-    AddLiuCacheList(filelist,temp);
+    AddLiuCacheList(filelist,temp,1);
   }
 
 }
@@ -263,7 +263,6 @@ Status TableBuilder::Finish() {
   Flush();
   assert(!r->closed);
   r->closed = true;
-
   BlockHandle filter_block_handle, metaindex_block_handle, index_block_handle;
 
   // Write filter block

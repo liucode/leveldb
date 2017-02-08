@@ -13,7 +13,9 @@ Slice *inputlast;
 LiuCacheList overlist = NULL;
 LiuCacheList memlist = NULL;
 LiuCacheList filelist = NULL;
+LiuCacheList outlist = NULL;
 Slice *smallblock = NULL;
+int lastflag = 0;
 int  liublocksize = 0;
 bool firstflag = true;
 bool flushflag = false;
@@ -103,6 +105,10 @@ LiuCache InitLiuCache(Iterator* iter)
 }
 void AddLiuCacheshen(LiuCacheList list,LiuCache newnode)
 {
+    if(newnode == NULL)
+    {
+        return;
+    }
     if(list->head ==NULL)
     {
        list->head = newnode;
@@ -116,21 +122,14 @@ void AddLiuCacheshen(LiuCacheList list,LiuCache newnode)
     else
     {
       list->tail->next = newnode;
-      if(newnode == NULL)
-      {
-    
-      }
-      else
-      {
           while(newnode->next)
          {
            newnode = newnode->next;
          }
         list->tail = newnode;
-      }
     }
 }
-void AddLiuCacheList(LiuCacheList list,LiuCache newnode)
+void AddLiuCacheList(LiuCacheList list,LiuCache newnode,int p)
 {
   if(list->head ==NULL)
   {
@@ -140,6 +139,12 @@ void AddLiuCacheList(LiuCacheList list,LiuCache newnode)
   }
   else
   {
+    if(p==1)
+    {if(newnode->small->compare(*(list->tail->large))<=0)
+    {
+        printf("error add\n");
+        exit(0);
+    }}
     list->tail->next = newnode;
     list->tail = newnode;
     newnode->next = NULL;
@@ -153,11 +158,13 @@ void AddLiuIterList(LiuCacheList list,Iterator* iter)
   {
     list->head = newnode;
     list->tail = newnode;
+    list->tail->next = NULL;
   }
   else
   {
     list->tail->next = newnode;
     list->tail = newnode;
+    list->tail->next = NULL;
   }
 }
 

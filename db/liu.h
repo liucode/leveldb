@@ -1,3 +1,4 @@
+#define BLOCKS 400
 #define DEBUG true
 #include "malloc.h"
 #include "leveldb/iterator.h"
@@ -32,19 +33,21 @@ extern Slice *smallblock;
 extern LiuCacheList filelist;
 extern std::map<int,LiuCacheList> filemata;
 extern int liublocksize;
+extern int lastflag;
 extern LiuCacheList memlist;
 extern bool firstflag;
 extern std::map<std::string,LiuCache> largemap; 
 extern bool flushflag;
 extern int sizecache;
 extern LiuCacheList overlist;
+extern LiuCacheList outlist;
 extern int sizetemp;
 extern bool smallflag;
 void PrintSize(LiuCacheList list);
 void PrintList(LiuCacheList list);
 void AddLiuCacheshen(LiuCacheList list,LiuCache newnode);
 void DeleteHead(LiuCache head);
-void AddLiuCacheList(LiuCacheList list,LiuCache newnode);
+void AddLiuCacheList(LiuCacheList list,LiuCache newnode,int p);
 LiuCache InitLiuCache(LiuCache newnode,Iterator* iter);
 void AddLiuIterList(LiuCacheList list,Iterator* iter);
 void CheckList(LiuCacheList list);
