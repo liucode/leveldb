@@ -10,7 +10,8 @@ std::map<int,LiuCacheList> filemata;
 std::map<std::string,LiuCache> largemap; 
 Slice *lastkey;
 Slice *inputlast;
-LiuCacheList overlist = NULL;
+LiuCacheList overlist1 = NULL;
+LiuCacheList overlist2 = NULL;
 LiuCacheList memlist = NULL;
 LiuCacheList filelist = NULL;
 LiuCacheList outlist = NULL;
@@ -22,6 +23,38 @@ bool flushflag = false;
 int sizecache = 0;
 int sizetemp = 0;
 bool smallflag = false;
+
+
+void AddLargemap(LiuCache p)
+{
+    if(overlist1->tail==NULL&&overlist2->tail == NULL)
+    {
+            return;
+    }
+    else if(overlist1->tail!=NULL&&overlist2->tail == NULL)
+    {
+      std::string so = std::string(overlist1->tail->large->data(),overlist1->tail->large->size()-8);
+      largemap.insert(std::pair<std::string,LiuCache>(so,p));
+    }
+    else if(overlist1->tail==NULL&&overlist2->tail != NULL)
+    {
+        std::string so = std::string(overlist2->tail->large->data(),overlist2->tail->large->size()-8);
+        largemap.insert(std::pair<std::string,LiuCache>(so,p));
+    }
+    else
+    {
+        if(overlist1->tail->large->compare(*overlist2->tail->large)>0)
+        {
+             std::string so = std::string(overlist1->tail->large->data(),overlist1->tail->large->size()-8);
+            largemap.insert(std::pair<std::string,LiuCache>(so,p));
+        }
+        else
+        {
+          std::string so = std::string(overlist2->tail->large->data(),overlist2->tail->large->size()-8);
+          largemap.insert(std::pair<std::string,LiuCache>(so,p));
+        }
+    }
+}
 
 void CheckList(LiuCacheList list)
 {

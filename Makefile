@@ -11,7 +11,7 @@
 # (B) Debug mode, w/ full line-level debugging symbols
  #OPT ?= -g2
 # (C) Profiling mode: opt, but w/debugging symbols
-OPT ?= -O0 -g3 -rdynamic
+OPT ?= -pg -O0 -g3 -rdynamic
 #OPT ?= -ggdb3
 #-----------------------------------------------
 

@@ -128,17 +128,17 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
   r->data_block.Add(key, value);
  if(flushflag)
   {   
-  int flushliu = 0;
-  std::string so = std::string(key.data(),key.size()-8);
-  std::map<std::string,LiuCache> ::iterator it= largemap.find(so); 
-  if(it != largemap.end()) {//get
+    int flushliu = 0;
+    std::string so = std::string(key.data(),key.size()-8);
+    std::map<std::string,LiuCache> ::iterator it= largemap.find(so); 
+    if(it != largemap.end()) {//get
         flushliu =1;
         printf("liu flush\n");
-  }
+    }
   const size_t estimated_block_size = r->data_block.CurrentSizeEstimate();
   if (estimated_block_size >= r->options.block_size) {
       Flush();
-  }
+    }
   else if(flushliu==1)
     {
       Flush();

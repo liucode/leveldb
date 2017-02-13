@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
-
+#include <time.h>
+#include "table/liuiterator.h"
 #include "db/version_set.h"
 
 #include <algorithm>
@@ -1291,17 +1292,33 @@ Iterator* VersionSet::MakeInputIterator(Compaction* c) {
 
     assert(num <= space);
   */
-    Iterator** list = new Iterator*[sizetemp];
-    LiuCache p = overlist->head;
     int num = 0;
-    while(p)
+    Iterator** list;
+    if(sizetemp>0&&sizecache>0)
     {
-      list[num++] = p->biter;
-      p = p->next;
+      list = new Iterator*[2];
     }
-    printf("num sizetemp:%d %d\n",num,sizetemp);
-    Iterator* result = NewMergingIterator(&icmp_, list, num);
-    delete[] list;
+    else if(sizetemp>0&&sizecache==0||sizetemp==0&&sizecache>0)
+    {
+       list = new Iterator*[1];
+    }
+    else
+    {
+        
+    }
+    if(sizetemp!=0)
+    {
+      Iterator* result1 = NewLiuIterator(&icmp_, overlist1, sizecache);
+      list[num++] = result1;
+    }
+    if(sizecache!=0)
+    {
+      Iterator* result2 = NewLiuIterator(&icmp_, overlist2, sizetemp);
+      list[num++] = result2;
+    }
+    Iterator* result = NewMergingIterator(&icmp_, list,num);
+    if(sizetemp+sizecache!=0)
+      delete[] list;
   return result;
 }
 
@@ -1436,7 +1453,6 @@ Compaction* VersionSet::CompactRange(
   if (inputs.empty()) {
     return NULL;
   }
-
   // Avoid compacting too much in one shot in case the range is large.
   // But we cannot do this for level-0 since level-0 files can overlap
   // and we must not pick one file and drop another older file if the
@@ -1453,7 +1469,6 @@ Compaction* VersionSet::CompactRange(
       }
     }
   }
-
   Compaction* c = new Compaction(options_, level);
   c->input_version_ = current_;
   c->input_version_->Ref();

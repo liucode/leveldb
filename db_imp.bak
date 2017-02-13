@@ -1,5 +1,5 @@
+
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
-#include "db/liutime.h"
 #include "table/format.h"
 #include "db/db_impl.h"
 #include <map>
@@ -688,6 +688,7 @@ void DBImpl::BackgroundCall() {
 
 void DBImpl::BackgroundCompaction() {
   mutex_.AssertHeld();
+
   if (imm_ != NULL) {
     CompactMemTable();
     return;
@@ -740,8 +741,8 @@ void DBImpl::BackgroundCompaction() {
     if (!status.ok()) {
       RecordBackgroundError(status);
     }
-    //if(sizecache+sizetemp!=0)
-    CleanupCompaction(compact);
+    if(sizetemp!=0)
+      CleanupCompaction(compact);
     c->ReleaseInputs();
     DeleteObsoleteFiles();
   }
@@ -903,16 +904,16 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
           }
     if(outlist->head!=NULL)
     {
-      filelist->head = NULL;
-      filelist->tail = NULL;
-      compact->current_output()->smallest.DecodeFrom(*outlist->head->small); 
-      compact->current_output()->largest.DecodeFrom(*outlist->tail->large); 
-      std::string st = outlist->head->small->data();
-      std::string lt = outlist->tail->large->data();
-      PrintSize(outlist);
-      filemata.insert(std::pair<int,LiuCacheList>(output_number,outlist));
-      printf("%c%c%c%c%c and %c%c%c%c%c\n",st[0],st[1],st[2],st[3],st[4],lt[0],lt[1],lt[2],lt[3],lt[4]);
-      printf("out:%d\n",output_number);
+    filelist->head = NULL;
+    filelist->tail = NULL;
+    compact->current_output()->smallest.DecodeFrom(*outlist->head->small); 
+    compact->current_output()->largest.DecodeFrom(*outlist->tail->large); 
+    std::string st = outlist->head->small->data();
+    std::string lt = outlist->tail->large->data();
+    PrintSize(outlist);
+    filemata.insert(std::pair<int,LiuCacheList>(output_number,outlist));
+    printf("%c%c%c%c%c and %c%c%c%c%c\n",st[0],st[1],st[2],st[3],st[4],lt[0],lt[1],lt[2],lt[3],lt[4]);
+    printf("out:%d\n",output_number);
     }
     outlist = (LiuCacheList)malloc(sizeof(struct liucachelist)); 
     outlist->head =NULL;
@@ -980,9 +981,7 @@ Status DBImpl::InstallCompactionResults(CompactionState* compact) {
 Status DBImpl::DoCompactionWork(CompactionState* compact) {
   const uint64_t start_micros = env_->NowMicros();
   int64_t imm_micros = 0;  // Micros spent doing imm_ compactions
-  clock_t starts,ends,compacts,before,after;
-  starts = clock();
-   
+
   Log(options_.info_log,  "Compacting %d@%d + %d@%d files",
       compact->compaction->num_input_files(0),
       compact->compaction->level(),
@@ -1014,7 +1013,8 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
     
     std::map<std::string,int> smallsort0,smallsort1;
     //获取块级别信息到list中
-   for(i = 0;i<2;i++)
+    clock_t starts,ends,compacts,before,after;
+    for(i = 0;i<2;i++)
       for(j = 0;j<compact->compaction->num_input_files(i);j++)
         {
           FileMetaData * fmd = compact->compaction->input(i,j);
@@ -1128,21 +1128,14 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
         memlist = (LiuCacheList)malloc(sizeof(struct liucachelist));
       }
       
-      if(overlist1 ==NULL)
+      if(overlist ==NULL)
       {
-        overlist1 = (LiuCacheList)malloc(sizeof(struct liucachelist));
-      }
-      if(overlist2 == NULL)
-      {
-        overlist2 = (LiuCacheList)malloc(sizeof(struct liucachelist));
+        overlist = (LiuCacheList)malloc(sizeof(struct liucachelist));
       }
       memlist->head = NULL;
       memlist->tail =NULL;
-      overlist1->head = NULL;
-      overlist1->tail =NULL;
-      overlist2->head = NULL;
-      overlist2->tail =NULL;
-      
+      overlist->head = NULL;
+      overlist->tail =NULL;
       if(filelist==NULL)
       {
         filelist = (LiuCacheList)malloc(sizeof(struct liucachelist));
@@ -1163,7 +1156,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       */
       filelist->head = NULL;
       filelist->tail = NULL;
-      sizecache = 0;
+
       sizetemp = 0;//记录有多少块存在于文件中
       //两个顺序链表合并,需要留出空隙的块记录在largemap中
       int flagp = 0;
@@ -1175,14 +1168,18 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
           if(flagp == 1)
           {
             pnext = p->next;
-            sizecache++;
-            AddLiuCacheList(overlist1,p,0);
+            sizetemp++;
+            AddLiuCacheList(overlist,p,0);
             p = pnext;
             flagp =0;
           }
           else
           {
-              AddLargemap(p);
+              if(overlist->tail!=NULL)
+              {
+                 std::string so = std::string(overlist->tail->large->data(),overlist->tail->large->size()-8);
+                 largemap.insert(std::pair<std::string,LiuCache>(so,p));
+              }
               pnext = p->next;
               AddLiuCacheList(memlist,p,1);
               p = pnext;
@@ -1194,13 +1191,17 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
           {
               qnext = q->next;
               sizetemp++;
-              AddLiuCacheList(overlist2,q,0);
+              AddLiuCacheList(overlist,q,0);
               q = qnext;
               flagq =0;
           }
           else
           {
-            AddLargemap(q);
+            if(overlist->tail!=NULL)
+            {
+                std::string so = std::string(overlist->tail->large->data(),overlist->tail->large->size()-8); 
+                largemap.insert(std::pair<std::string,LiuCache>(so,q));
+            }
             qnext = q->next;
             AddLiuCacheList(memlist,q,1);
             q = qnext;
@@ -1212,7 +1213,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
           {
               qnext = q->next;
               sizetemp++;
-              AddLiuCacheList(overlist2,q,0);
+              AddLiuCacheList(overlist,q,0);
               q = qnext;
               flagp = 1;
               flagq =0;
@@ -1220,8 +1221,8 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
           else
           {
               pnext = p->next;
-              sizecache++;
-              AddLiuCacheList(overlist1,p,0);
+              sizetemp++;
+              AddLiuCacheList(overlist,p,0);
               p = pnext;
               flagp = 0;
               flagq = 1;
@@ -1236,9 +1237,10 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
          else
          {
             pnext = p->next;
-            sizecache++;
-            AddLiuCacheList(overlist1,p,0);
-            AddLargemap(p);
+            sizetemp++;
+            AddLiuCacheList(overlist,p,0);
+            std::string so = std::string(overlist->tail->large->data(),overlist->tail->large->size()-8);  
+            largemap.insert(std::pair<std::string,LiuCache>(so,pnext));
             AddLiuCacheshen(memlist,pnext); 
          }
       }
@@ -1250,8 +1252,9 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
           {
               qnext = q->next;
               sizetemp++;
-              AddLiuCacheList(overlist2,q,0);
-              AddLargemap(q);
+              AddLiuCacheList(overlist,q,0);
+              std::string so = std::string(overlist->tail->large->data(),overlist->tail->large->size()-8);  
+              largemap.insert(std::pair<std::string,LiuCache>(so,qnext));
               AddLiuCacheshen(memlist,qnext); 
           }
       }
@@ -1287,10 +1290,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   int blocknum =0;//标记每个文件真实大小：内存块数+文件实际块数
   lastflag = 0;//出现最后一个块
   //数据全部在内存中，overlist为空
-  
-  int nexttime =0;
-Status status;
-if((sizecache+sizetemp) ==0)
+  if(sizetemp ==0)
    {
        printf("sizetemp==0\n");
        LiuCache memcache = memlist->head;
@@ -1306,12 +1306,11 @@ if((sizecache+sizetemp) ==0)
             memcache = mnext;
            }//while block
            memlist->head = memcache;//防止进入完成检查，重新刷入内存中数据
-           status = FinishCompactionOutputFile(compact, input);//直接返回，直到memcache为空
+           FinishCompactionOutputFile(compact, input);//直接返回，直到memcache为空
            blocknum = 0;//重置计数器
        }//while memcache
-  }
-  else
-  {
+  }//if
+  //记录最后一个key值
   input->SeekToLast();
   if(input->Valid())
   {
@@ -1324,14 +1323,16 @@ if((sizecache+sizetemp) ==0)
   }
   
   input->SeekToFirst();
+  Status status;
   ParsedInternalKey ikey;
   std::string current_user_key;
   bool has_current_user_key = false;
   SequenceNumber last_sequence_for_key = kMaxSequenceNumber;
-  ends = clock();
+  int nexttime =0;
   for (; input->Valid() && !shutting_down_.Acquire_Load(); ) {
     // Prioritize immutable compaction work
   if (has_imm_.NoBarrier_Load() != NULL) {
+      printf("wait 0\n");
       const uint64_t imm_start = env_->NowMicros();
       mutex_.Lock();
       if (imm_ != NULL) {
@@ -1424,7 +1425,7 @@ if((sizecache+sizetemp) ==0)
           //compact->current_output()->smallest.DecodeFrom(key);
         }
           //compact->current_output()->largest.DecodeFrom(key);*/
-       compact->builder->Add(key, input->value());
+       //compact->builder->Add(key, input->value());
        //merge memlist and filelist
       
        //FILE *ffp = fopen("filelist","w");
@@ -1448,8 +1449,7 @@ if((sizecache+sizetemp) ==0)
                      if(compact->builder == NULL)
                      {
                          
-             
-         OpenCompactionOutputFile(compact);
+                       OpenCompactionOutputFile(compact);
                     } 
                   break;//如果文件大小>=规定的大小，形成文件
                }
@@ -1497,10 +1497,10 @@ if((sizecache+sizetemp) ==0)
               filelist->tail = filecache;
               blocknum = 0;
               FinishCompactionOutputFile(compact, input); 
-              OpenCompactionOutputFile(compact);
               memcache = memlist->head;
               filecache = NULL;
               filelist->head = NULL;
+                
             }
             else
             {
@@ -1520,11 +1520,13 @@ if((sizecache+sizetemp) ==0)
         }
       }
     }
-    compacts = clock();
+    
+    starts = clock();
     input->Next();
-    before = clock();
-    nexttime += (before-compacts);
+    ends = clock();
+    nexttime = nexttime+(ends-starts);
   }
+        printf("time: %d\n",nexttime);
         LiuCache memcache = memlist->head;
         LiuCache filecache = filelist->head;
         LiuCache mnext,fnext;
@@ -1597,8 +1599,7 @@ if((sizecache+sizetemp) ==0)
   }
   delete input;
   input = NULL;
-  }//==else  
-//delete largemap
+  //delete largemap
   std::map<std::string,LiuCache> ::iterator it;
   for(it=largemap.begin();it!=largemap.end();it++)
   {
@@ -1614,6 +1615,7 @@ if((sizecache+sizetemp) ==0)
   for (size_t i = 0; i < compact->outputs.size(); i++) {
     stats.bytes_written += compact->outputs[i].file_size;
   }
+
   mutex_.Lock();
   stats_[compact->compaction->level() + 1].Add(stats);
 
@@ -1626,9 +1628,6 @@ if((sizecache+sizetemp) ==0)
   VersionSet::LevelSummaryStorage tmp;
   Log(options_.info_log,
       "compacted to: %s", versions_->LevelSummary(&tmp));
-  after = clock();
-  liutime +=(after-starts);
-  printf("time: %d %d\n",after-starts,liutime);
   flushflag = false;
   return status;
 }
@@ -1731,7 +1730,7 @@ Status DBImpl::Get(const ReadOptions& options,
                               if(biter->value().size()==0)
                                   return Status::NotFound(Slice());
                           
-                              value->assign(biter->value().ToString());
+                              value->assign("l:"+biter->value().ToString());
                               return Status::OK();
                             }//ifuserkey3
                           }
@@ -1818,7 +1817,7 @@ void DBImpl::ReleaseSnapshot(const Snapshot* s) {
 
 // Convenience methods
 Status DBImpl::Put(const WriteOptions& o, const Slice& key, const Slice& val) {
-    return DB::Put(o, key, val);
+  return DB::Put(o, key, val);
 }
 
 Status DBImpl::Delete(const WriteOptions& options, const Slice& key) {
