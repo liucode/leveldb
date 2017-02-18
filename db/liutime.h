@@ -1,1 +1,2 @@
-extern int liutime;
+extern double liufile;
+extern double liutime;

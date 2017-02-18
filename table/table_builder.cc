@@ -133,7 +133,7 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
     std::map<std::string,LiuCache> ::iterator it= largemap.find(so); 
     if(it != largemap.end()) {//get
         flushliu =1;
-        printf("liu flush\n");
+        //printf("liu flush\n");
     }
   const size_t estimated_block_size = r->data_block.CurrentSizeEstimate();
   if (estimated_block_size >= r->options.block_size) {
@@ -142,9 +142,11 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
   else if(flushliu==1)
     {
       Flush();
+      liublocksize += (r->options.block_size-estimated_block_size);
     }
     else
     {
+       //free(lastkey);
     }
   }
   else
@@ -189,7 +191,10 @@ void TableBuilder::Flush() {
     smallflag = false;
     LiuCache temp = (LiuCache)malloc(sizeof(struct liucache));
     temp->small = smallblock;
-    temp->large = lastkey;
+    char *lstr = (char*)malloc(lastkey->size());                                                                                                                        
+    memcpy(lstr,lastkey->data(),lastkey->size());
+    Slice *templstr = new Slice(lstr,lastkey->size());
+    temp->large = templstr;
     temp->biter = NULL;
     AddLiuCacheList(filelist,temp,1);
   }

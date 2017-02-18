@@ -8,7 +8,7 @@ namespace leveldb{
 
 std::map<int,LiuCacheList> filemata;
 std::map<std::string,LiuCache> largemap; 
-Slice *lastkey;
+Slice *lastkey=NULL;
 Slice *inputlast;
 LiuCacheList overlist1 = NULL;
 LiuCacheList overlist2 = NULL;
@@ -16,6 +16,8 @@ LiuCacheList memlist = NULL;
 LiuCacheList filelist = NULL;
 LiuCacheList outlist = NULL;
 Slice *smallblock = NULL;
+int nexttime =0;
+int noblocknum = 0;
 int lastflag = 0;
 int  liublocksize = 0;
 bool firstflag = true;
@@ -23,7 +25,6 @@ bool flushflag = false;
 int sizecache = 0;
 int sizetemp = 0;
 bool smallflag = false;
-
 
 void AddLargemap(LiuCache p)
 {
@@ -81,10 +82,12 @@ void WriteList(LiuCacheList list,FILE *fp)
     }
     fclose(fp);
 }
-void PrintSize(LiuCacheList list)
+int PrintSize(LiuCacheList list)
 {
       int nn=0;
       int num=0;
+      if(list == 0)
+          return 0;
       LiuCache p = list->head;
       while(p)
       {
@@ -93,7 +96,8 @@ void PrintSize(LiuCacheList list)
           num++;
           p = p->next;
       }
-        printf("listnum:%d %d\n",num,nn);
+      printf("num:%d %d\n",num,nn);
+       return num;
 }
 void PrintList(LiuCacheList list)
 {
