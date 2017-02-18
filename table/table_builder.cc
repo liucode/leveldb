@@ -166,7 +166,7 @@ void TableBuilder::Flush() {
     const size_t estimated_block_size = r->data_block.CurrentSizeEstimate();
     if(flushflag&&estimated_block_size < r->options.block_size)
         {
-          liublocksize+= (r->options.block_size-estimated_block_size);
+          //liublocksize+= (r->options.block_size-estimated_block_size);
           //printf("blocksize:%d\n",liublocksize);
         }
   }

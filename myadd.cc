@@ -6,7 +6,7 @@
 #include <leveldb/db.h>
 #include <time.h>
 using namespace std;
-
+#define MAXSIZE 1000
 char *rand_str(char *str,const int len)
 {
     int i;
@@ -18,39 +18,39 @@ char *rand_str(char *str,const int len)
  
 int main(int argc,char** argv)
 {
-  int loop =180000;
+  int loop =1000000;
   std::string data[1000];
   leveldb::DB *db;
   leveldb::Options options;
-  //if(argc<=1)
-   // printf("参数太少！\n");
   int i;
   options.create_if_missing=true;
-  //options.max_open_files = 1<<20;
-  //options.compression = false;
-  //options.write_buffer_size = 1<<13;
-  //options.max_file_size = 1<<13;
-  
-
   leveldb::Status status = leveldb::DB::Open(options,"./testdb",&db);
   assert(status.ok());
   std::string value;
   leveldb::WriteOptions write_options;
-  //write_options.sync = true;
   int count=0;
-
-  for(i=0;i<loop;i+=2)
+  clock_t starts,ends,dels;
+  starts = clock();
+  FILE *fp = fopen("number","a+");
+  for(i=0;i<loop;i++)
   {
     srand(i);
-    char name[4000+1];
-    int len = (rand() % (4000-1))+ 1;
-    rand_str(name,400);
+    char key[10+1];
+    char name[1000+1];
+    rand_str(name,MAXSIZE);
     std::string temp = name;
-    std::string s = to_string(i);
-    //s.append(temp);
-    leveldb::Status status=db->Put(write_options,s,s);
+    rand_str(key,10);
+    std::string s = key;
+    leveldb::Status status=db->Put(write_options,s,temp);
     if (!status.ok()) cerr << status.ToString() << endl;
+    ends = clock();
+    if(ends-starts >= 1000000)
+    {
+      fprintf(fp,"%d\n",i);
+      starts = clock();
+    }
   }
+  fclose(fp);
   db->CompactRange(NULL,NULL);
   delete db;
   return 0;

@@ -47,7 +47,7 @@ void AddLargemap(LiuCache p)
         if(overlist1->tail->large->compare(*overlist2->tail->large)>0)
         {
              std::string so = std::string(overlist1->tail->large->data(),overlist1->tail->large->size()-8);
-            largemap.insert(std::pair<std::string,LiuCache>(so,p));
+             largemap.insert(std::pair<std::string,LiuCache>(so,p));
         }
         else
         {
