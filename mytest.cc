@@ -5,7 +5,7 @@
 #include <string>
 #include <leveldb/db.h>
 #include <time.h>
-#define MAXSIZE  128
+#define MAXSIZE  64
 #define DATALEN 1000
 #define KEYLEN 10
 using namespace std;
@@ -21,7 +21,7 @@ char *rand_str(char *str,const int len)
  
 int main(int argc,char** argv)
 {
-  int loop =16000000;
+  int loop =32000000;
   int datalen = 1000;
   std::string data[datalen];
   leveldb::DB *db;

@@ -18,7 +18,7 @@ char *rand_str(char *str,const int len)
  
 int main(int argc,char** argv)
 {
-  int loop =1000000;
+  int loop =2000000;
   std::string data[1000];
   leveldb::DB *db;
   leveldb::Options options;
@@ -30,9 +30,9 @@ int main(int argc,char** argv)
   leveldb::WriteOptions write_options;
   int count=0;
   clock_t starts,ends,dels;
-  starts = clock();
+  dels = clock();
   FILE *fp = fopen("number","a+");
-  for(i=0;i<loop;i++)
+  for(i=0;i<loop;i+=2)
   {
     srand(i);
     char key[10+1];
@@ -41,17 +41,18 @@ int main(int argc,char** argv)
     std::string temp = name;
     rand_str(key,10);
     std::string s = key;
-    leveldb::Status status=db->Put(write_options,s,temp);
+    leveldb::Status status=db->Put(write_options,key,temp);
     if (!status.ok()) cerr << status.ToString() << endl;
-    ends = clock();
-    if(ends-starts >= 1000000)
+    if(i%1000==0)
     {
-      fprintf(fp,"%d\n",i);
-      starts = clock();
+      ends = clock();  
+      fprintf(fp,"%d\n",ends-dels);
     }
   }
+  ends = clock();
   fclose(fp);
   db->CompactRange(NULL,NULL);
   delete db;
+  printf("time: %d",ends-dels);
   return 0;
 }
