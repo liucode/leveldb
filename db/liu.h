@@ -1,4 +1,4 @@
-#define BLOCKS 400
+#define BLOCKS 520
 #define DEBUG true
 #include "malloc.h"
 #include "leveldb/iterator.h"
@@ -28,11 +28,12 @@ struct liucachelist
 
 #endif
 extern Slice *inputlast;
-extern Slice *lastkey;
+extern std::string lastkey;
 extern Slice *smallblock;
 extern LiuCacheList filelist;
 extern std::map<int,LiuCacheList> filemata;
-extern int liublocksize;
+extern double liublocksize;
+extern int liublocknum;
 extern int lastflag;
 extern LiuCacheList memlist;
 extern bool firstflag;

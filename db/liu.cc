@@ -8,7 +8,7 @@ namespace leveldb{
 
 std::map<int,LiuCacheList> filemata;
 std::map<std::string,LiuCache> largemap; 
-Slice *lastkey=NULL;
+std::string lastkey;
 Slice *inputlast;
 LiuCacheList overlist1 = NULL;
 LiuCacheList overlist2 = NULL;
@@ -19,7 +19,9 @@ Slice *smallblock = NULL;
 int nexttime =0;
 int noblocknum = 0;
 int lastflag = 0;
-int  liublocksize = 0;
+
+int liublocknum = 0;
+double  liublocksize = 0;
 bool firstflag = true;
 bool flushflag = false;
 int sizecache = 0;
@@ -177,7 +179,7 @@ void AddLiuCacheList(LiuCacheList list,LiuCache newnode,int p)
   else
   {
     if(p==1)
-    {if(newnode->small->compare(*(list->tail->large))<=0)
+    {if(newnode->small->compare(*(list->tail->large))<0)
     {
         printf("error add\n");
         exit(0);

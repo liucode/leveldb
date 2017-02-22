@@ -61,6 +61,7 @@ static int64_t TotalFileSize(const std::vector<FileMetaData*>& files) {
   int64_t sum = 0;
   for (size_t i = 0; i < files.size(); i++) {
     sum += files[i]->file_size;
+    //sum += 2200000;
   }
   return sum;
 }

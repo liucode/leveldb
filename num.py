@@ -10,7 +10,8 @@ def totalfilesize():
             if(lines[5].startswith('started')):
                continue
             else:
-               filesize = filesize + float(lines[5])/1024/1024
+               continue
+               #filesize = filesize + float(lines[5])/1024/1024
 
         if(lines[2].startswith('Generated')):
             filesize = filesize +float(lines[7])/1024/1024

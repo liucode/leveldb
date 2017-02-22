@@ -28,6 +28,7 @@ struct TableBuilder::Rep {
   BlockBuilder data_block;
   BlockBuilder index_block;
   std::string last_key;
+  std::string small_key;
   int64_t num_entries;
   bool closed;          // Either Finish() or Abandon() has been called.
   FilterBlockBuilder* filter_block;
@@ -93,22 +94,19 @@ Status TableBuilder::ChangeOptions(const Options& options) {
 
 void TableBuilder::Add(const Slice& key, const Slice& value) {
  //
-  if(flushflag&&!smallflag)
-  {
-    char *str = (char*)malloc(key.size());
-    memcpy(str,key.data(),key.size());
-    Slice *tempstr = new Slice(str,key.size());
-    smallblock = (Slice*)tempstr;
-    smallflag = true;
-  }
- 
-  Rep* r = rep_;
+   Rep* r = rep_;
   assert(!r->closed);
   if (!ok()) return;
   if (r->num_entries > 0) {
       if(r->options.comparator->Compare(key, Slice(r->last_key)) == 0)
         return;
       assert(r->options.comparator->Compare(key, Slice(r->last_key)) > 0);
+  }
+  
+ if(flushflag&&!smallflag)
+  {
+    r->small_key.assign(key.data(),key.size());
+    smallflag = true;
   }
 
   if (r->pending_index_entry) {
@@ -137,12 +135,33 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
     }
   const size_t estimated_block_size = r->data_block.CurrentSizeEstimate();
   if (estimated_block_size >= r->options.block_size) {
+      if(flushliu == 1)
+      {
+          int tempbsize = r->options.block_size - (estimated_block_size%r->options.block_size);
+          if(tempbsize>r->options.block_size)
+          {
+               printf("error bsize");
+               exit(0);
+          }
+          //printf("Bubble %d\n",tempbsize);
+          //liublocksize += tempbsize;
+          //liublocknum += (estimated_block_size/r->options.block_size+1);
+      }
       Flush();
+      
     }
   else if(flushliu==1)
     {
       Flush();
-      liublocksize += (r->options.block_size-estimated_block_size);
+      int tempbsize = r->options.block_size - (estimated_block_size%r->options.block_size);
+           if(tempbsize>=r->options.block_size)
+          {
+               printf("error bsize");
+               exit(0);
+          }
+      printf("Bubble %d\n",tempbsize);
+      liublocknum+=(estimated_block_size/r->options.block_size+1);
+      liublocksize+=tempbsize;
     }
     else
     {
@@ -161,15 +180,6 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
 void TableBuilder::Flush() {
   Rep* r = rep_;   
   assert(!r->closed);
-  if(flushflag)
-  {
-    const size_t estimated_block_size = r->data_block.CurrentSizeEstimate();
-    if(flushflag&&estimated_block_size < r->options.block_size)
-        {
-          //liublocksize+= (r->options.block_size-estimated_block_size);
-          //printf("blocksize:%d\n",liublocksize);
-        }
-  }
   if (!ok()) return;
   if (r->data_block.empty()) return;
   assert(!r->pending_index_entry);
@@ -178,22 +188,22 @@ void TableBuilder::Flush() {
     r->pending_index_entry = true;
     r->status = r->file->Flush();
   }
-  else
-  {
-      printf("error5n");
-      exit(0);
-  }
   if (r->filter_block != NULL) {
     r->filter_block->StartBlock(r->offset);
   }
   if(flushflag&&r->num_entries!=0)
   {
     smallflag = false;
+    char *str = (char*)malloc(r->small_key.size());
+    memcpy(str,r->small_key.data(),r->small_key.size());
+    Slice *tempstr = new Slice(str,r->small_key.size());
+    smallblock = (Slice*)tempstr;
     LiuCache temp = (LiuCache)malloc(sizeof(struct liucache));
     temp->small = smallblock;
-    char *lstr = (char*)malloc(lastkey->size());                                                                                                                        
-    memcpy(lstr,lastkey->data(),lastkey->size());
-    Slice *templstr = new Slice(lstr,lastkey->size());
+    
+    char *lstr = (char*)malloc(lastkey.size());                                                                                                                      
+    memcpy(lstr,lastkey.data(),lastkey.size());
+    Slice *templstr = new Slice(lstr,lastkey.size());
     temp->large = templstr;
     temp->biter = NULL;
     AddLiuCacheList(filelist,temp,1);

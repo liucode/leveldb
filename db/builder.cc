@@ -3,7 +3,7 @@
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 
 #include "db/builder.h"
-
+#include "db/liu.h"
 #include "db/filename.h"
 #include "db/dbformat.h"
 #include "db/table_cache.h"
